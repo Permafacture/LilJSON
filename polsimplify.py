@@ -6,6 +6,7 @@ http://www2.dcs.hull.ac.uk/CISRG/publications/DPs/DP10/DP10.html
 Copyright 2012 Flávio Codeco Coelho
 License: GPL v3
 """
+import copy
 
 def triangle_area(p1,p2,p3):
     """
@@ -19,12 +20,19 @@ class JSONSimplify(object):
         self.features = feature_collection["features"]
 
 
-    def simplify(self):
-        simplified_features = [self.simplify_geometry(f) for f in self.features]
+    def simplify(self,threshold=0):
+        """
+        Simplifies polygons by eliminating points which form with neighboring points a triangle of area less than threshold
+        with threshold = 0, the simplification is non-destructive. Use with care for values above 0.
+        """
+        simplified_features = [self._simplify_geometry(f,threshold) for f in self.features]
         self.data["features"] = simplified_features
         return self.data
 
-    def simplify_geometry(self, feature):
+    def _simplify_geometry(self, feature,threshold=0):
+        """
+        Simplifies polygons in a feature and returns
+        """
         geometry = feature["geometry"]
         assert isinstance(geometry,dict)
         if "type" in geometry and geometry["type"] == "Polygon":
@@ -38,8 +46,26 @@ class JSONSimplify(object):
         for n,area in areas.iteritems():
             if area == 0:
                 deleted[n] = area
+        # now, sequentially remove triangles with areas less than threshold
+        for n in deleted.iterkeys():
+            del areas[n]
+        filtered_areas = copy.deepcopy(areas)
+        while area < threshold:
+            if len(filtered_areas) < 25: break
+#            if not filtered_areas: break # all areas
+            area = min(filtered_areas.values())
+            if area > threshold: break
+            for n,a in areas.iteritems():
+                if n not in filtered_areas: continue
+                if a == area:
+                    deleted[n] = a
+                    del filtered_areas[n]
+
+
+
 
         feature["geometry"]["coordinates"] = [[c for n,c in enumerate(coordinates) if n not in deleted]]
+        print area, len(areas)-len(filtered_areas), len(areas)
         return feature
 
 if __name__=="__main__":
@@ -47,7 +73,7 @@ if __name__=="__main__":
     with open('pt.json','r') as f:
         data = json.load(f)
     L = JSONSimplify(data)
-    data_s = L.simplify()
+    data_s = L.simplify(7e-3)
     with open('pt_s.json','w') as f:
         json.dump(data_s,f,separators=(',', ':'))
 
