@@ -1,6 +1,6 @@
 # coding: utf8
 """
-Simplification of polygonal lines according to Visvalingam's algorothm:
+Simplification of polygonal lines according to Visvalingam's algorithm:
 http://www2.dcs.hull.ac.uk/CISRG/publications/DPs/DP10/DP10.html
 
 Copyright 2012 Flávio Codeco Coelho
@@ -52,7 +52,7 @@ class JSONSimplify(object):
         filtered_areas = copy.deepcopy(areas)
         while area < threshold:
             if len(filtered_areas) < 25: break
-#            if not filtered_areas: break # all areas
+
             area = min(filtered_areas.values())
             if area > threshold: break
             for n,a in areas.iteritems():
@@ -61,20 +61,16 @@ class JSONSimplify(object):
                     deleted[n] = a
                     del filtered_areas[n]
 
-
-
-
         feature["geometry"]["coordinates"] = [[c for n,c in enumerate(coordinates) if n not in deleted]]
-        print area, len(areas)-len(filtered_areas), len(areas)
         return feature
 
 if __name__=="__main__":
     import json
-    with open('pt.json','r') as f:
+    with open('data.json','r') as f:
         data = json.load(f)
     L = JSONSimplify(data)
-    data_s = L.simplify(7e-3)
-    with open('pt_s.json','w') as f:
+    data_s = L.simplify(0.001)
+    with open('data_s.json','w') as f:
         json.dump(data_s,f,separators=(',', ':'))
 
 
