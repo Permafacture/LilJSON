@@ -1,10 +1,6 @@
 from sys import stdin, stdout
-from json import load, JSONEncoder
+import json
 from optparse import OptionParser
-from re import compile
-
-float_pat = compile(r'^-?\d+\.\d+(e-?\d+)?$')
-charfloat_pat = compile(r'^[\[,\,]-?\d+\.\d+(e-?\d+)?$')
 
 parser = OptionParser(usage="""%prog [options]
 
@@ -23,6 +19,14 @@ parser.set_defaults(**defaults)
 parser.add_option('-p', '--precision', dest='precision',
                   type='int', help='Digits of precision, default %(precision)d.' % defaults)
 
+def encoded(fobj):
+    encoder = json.JSONEncoder(separators=(',', ':'), parse_float=lambda x:round(float(x), options.precision))
+
+    for l in fobj:
+        yield encoder.encode(l)
+
+
+
 if __name__ == '__main__':
     options, args = parser.parse_args()
     
@@ -30,25 +34,17 @@ if __name__ == '__main__':
     # Read!
     #
     input = len(args) and open(args[0]) or stdin
-    data = load(input)
+    data = json.load(input, parse_float=lambda x:round(float(x), options.precision))
     
     #
     # Write!
     #
-    encoder = JSONEncoder(separators=(',', ':'))
+    encoder = json.JSONEncoder(separators=(',', ':'))
     encoded = encoder.iterencode(data)
     
     format = '%.' + str(options.precision) + 'f'
     output = len(args) == 2 and open(args[1], 'w') or stdout
     
     for token in encoded:
-        if charfloat_pat.match(token):
-            # in python 2.7, we see a character followed by a float literal
-            output.write(token[0] + format % float(token[1:]))
+        output.write(token)
 
-        elif float_pat.match(token):
-            # in python 2.6, we see a simple float literal
-            output.write(format % float(token))
-
-        else:
-            output.write(token)
