@@ -19,11 +19,6 @@ parser.set_defaults(**defaults)
 parser.add_option('-p', '--precision', dest='precision',
                   type='int', help='Digits of precision, default %(precision)d.' % defaults)
 
-def encoded(fobj):
-    encoder = json.JSONEncoder(separators=(',', ':'), parse_float=lambda x:round(float(x), options.precision))
-
-    for l in fobj:
-        yield encoder.encode(l)
 
 
 
