@@ -5,6 +5,10 @@ http://www2.dcs.hull.ac.uk/CISRG/publications/DPs/DP10/DP10.html
 
 Copyright 2012 Flávio Codeco Coelho
 License: GPL v3
+
+Edited by Elliot Hallmark 07/2014 to seperate polygon
+ simplification from geojson specific object
+
 """
 import copy
 
@@ -14,6 +18,37 @@ def triangle_area(p1,p2,p3):
     """
     return abs(p1[0]*(p2[1]-p3[1])+p2[0]*(p1[1]-p3[1])+p3[0]*(p1[1]-p2[1]))/2.
 
+def polygon_simplify(coordinates, threshold=0):
+      """
+      Simplifies polygons by eliminating points which form 
+      with neighboring points a triangle of area less than 
+      threshold.
+
+      with threshold = 0, the simplification is non-destructive. 
+      Use with care for values above 0.
+      """
+      deleted = {}
+      areas = {n : triangle_area(coordinates[n-1],coordinates[n],coordinates[n+1]) for n in range(1,len(coordinates)-1)}
+      # First, non-destructive elimination of co-linear points
+      for n,area in areas.iteritems():
+          if area == 0:
+              deleted[n] = area
+      # now, sequentially remove triangles with areas less than threshold
+      for n in deleted.iterkeys():
+          del areas[n]
+      filtered_areas = copy.deepcopy(areas)
+      while area < threshold:
+          if len(filtered_areas) < 25: break
+
+          area = min(filtered_areas.values())
+          if area > threshold: break
+          for n,a in areas.iteritems():
+              if n not in filtered_areas: continue
+              if a == area:
+                  deleted[n] = a
+                  del filtered_areas[n]
+      return [c for n,c in enumerate(coordinates) if n not in deleted]
+
 class JSONSimplify(object):
     def __init__(self, feature_collection):
         self.data = feature_collection
@@ -22,8 +57,12 @@ class JSONSimplify(object):
 
     def simplify(self,threshold=0):
         """
-        Simplifies polygons by eliminating points which form with neighboring points a triangle of area less than threshold
-        with threshold = 0, the simplification is non-destructive. Use with care for values above 0.
+        Simplifies all polgon features in a geojson object 
+        by eliminating points which form with neighboring points 
+        a triangle of area less than threshold.
+
+        with threshold = 0, the simplification is non-destructive.
+        Use with care for values above 0.
         """
         simplified_features = [self._simplify_geometry(f,threshold) for f in self.features]
         self.data["features"] = simplified_features
@@ -40,28 +79,7 @@ class JSONSimplify(object):
         else:
             print geometry
             raise TypeError("Invalid Geometry")
-        deleted = {}
-        areas = {n : triangle_area(coordinates[n-1],coordinates[n],coordinates[n+1]) for n in range(1,len(coordinates)-1)}
-        # First, non-destructive elimination of co-linear points
-        for n,area in areas.iteritems():
-            if area == 0:
-                deleted[n] = area
-        # now, sequentially remove triangles with areas less than threshold
-        for n in deleted.iterkeys():
-            del areas[n]
-        filtered_areas = copy.deepcopy(areas)
-        while area < threshold:
-            if len(filtered_areas) < 25: break
-
-            area = min(filtered_areas.values())
-            if area > threshold: break
-            for n,a in areas.iteritems():
-                if n not in filtered_areas: continue
-                if a == area:
-                    deleted[n] = a
-                    del filtered_areas[n]
-
-        feature["geometry"]["coordinates"] = [[c for n,c in enumerate(coordinates) if n not in deleted]]
+        feature["geometry"]["coordinates"] = [polygon_simplify(coordinates, threshold=threshold)]
         return feature
 
 if __name__=="__main__":
