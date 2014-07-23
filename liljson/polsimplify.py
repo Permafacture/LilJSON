@@ -1,94 +1,29 @@
-# coding: utf8
-"""
-Simplification of polygonal lines according to Visvalingam's algorithm:
-http://www2.dcs.hull.ac.uk/CISRG/publications/DPs/DP10/DP10.html
+'''
 
-Copyright 2012 Flávio Codeco Coelho
-License: GPL v3
+The previous version of this file was not an implementation of Visvalingam's algorithim. It did not recalculate coordinate areas after removing coordinates, and of course also didn't worry about removing coordinates in the correct order.  So, if several adjacent points were all below the threshold, the flawed implementation removed all of them without regard for the consequences.
 
-Edited by Elliot Hallmark 07/2014 to seperate polygon
- simplification from geojson specific object
-
-"""
-import copy
-
-def triangle_area(p1,p2,p3):
-    """
-    calculates the area of a triangle given its vertices
-    """
-    return abs(p1[0]*(p2[1]-p3[1])+p2[0]*(p1[1]-p3[1])+p3[0]*(p1[1]-p2[1]))/2.
-
-def polygon_simplify(coordinates, threshold=0):
-      """
-      Simplifies polygons by eliminating points which form 
-      with neighboring points a triangle of area less than 
-      threshold.
-
-      with threshold = 0, the simplification is non-destructive. 
-      Use with care for values above 0.
-      """
-      deleted = {}
-      areas = {n : triangle_area(coordinates[n-1],coordinates[n],coordinates[n+1]) for n in range(1,len(coordinates)-1)}
-      # First, non-destructive elimination of co-linear points
-      for n,area in areas.iteritems():
-          if area == 0:
-              deleted[n] = area
-      # now, sequentially remove triangles with areas less than threshold
-      for n in deleted.iterkeys():
-          del areas[n]
-      filtered_areas = copy.deepcopy(areas)
-      while area < threshold:
-          if len(filtered_areas) < 25: break
-
-          area = min(filtered_areas.values())
-          if area > threshold: break
-          for n,a in areas.iteritems():
-              if n not in filtered_areas: continue
-              if a == area:
-                  deleted[n] = a
-                  del filtered_areas[n]
-      return [c for n,c in enumerate(coordinates) if n not in deleted]
-
-class JSONSimplify(object):
-    def __init__(self, feature_collection):
-        self.data = feature_collection
-        self.features = feature_collection["features"]
+The correct algorithim (as described at http://web.archive.org/web/20100428020453/http://www2.dcs.hull.ac.uk/CISRG/publications/DPs/DP10/DP10.html) is as follows.
 
 
-    def simplify(self,threshold=0):
-        """
-        Simplifies all polgon features in a geojson object 
-        by eliminating points which form with neighboring points 
-        a triangle of area less than threshold.
 
-        with threshold = 0, the simplification is non-destructive.
-        Use with care for values above 0.
-        """
-        simplified_features = [self._simplify_geometry(f,threshold) for f in self.features]
-        self.data["features"] = simplified_features
-        return self.data
+==================
 
-    def _simplify_geometry(self, feature,threshold=0):
-        """
-        Simplifies polygons in a feature and returns
-        """
-        geometry = feature["geometry"]
-        assert isinstance(geometry,dict)
-        if "type" in geometry and geometry["type"] == "Polygon":
-            coordinates = geometry["coordinates"][0]
-        else:
-            print geometry
-            raise TypeError("Invalid Geometry")
-        feature["geometry"]["coordinates"] = [polygon_simplify(coordinates, threshold=threshold)]
-        return feature
+The algorithm is as follows:
 
-if __name__=="__main__":
-    import json
-    with open('data.json','r') as f:
-        data = json.load(f)
-    L = JSONSimplify(data)
-    data_s = L.simplify(0.001)
-    with open('data_s.json','w') as f:
-        json.dump(data_s,f,separators=(',', ':'))
+ 
 
+Compute the effective area of each point (see Section 3.2)
 
+Delete all points with zero area and store them in a separate list with this area
+
+REPEAT
+
+- Find the point with the least effective area and call it the current point. If its calculated area is less than that of the last point to be eliminated, use the latter's area instead. (This ensures that the current point cannot be eliminated without eliminating previously eliminated points.)
+
+- Delete the current point from the original list and add this to the new list together with its associated area so that the line may be filtered at run time.
+
+       - Recompute the effective area of the two adjoining points (see Figure 1b).
+
+ UNTIL
+
+       - The original line consists of only 2 points, namely the start and end points.'''
